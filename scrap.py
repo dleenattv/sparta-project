@@ -1,10 +1,14 @@
+import schedule
 from selenium import webdriver
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
 import time
+import re
 
 client = MongoClient('localhost', 27017)
 db = client.openinfo
+
+# selenium 옵션
 options = webdriver.ChromeOptions()
 options.add_argument('headless')
 options.add_argument('window-size=1920x1080')
@@ -16,62 +20,140 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36'}
 
 path = 'C:/Users/YJ/Desktop/sparta/chromedriver'
-driver_interpark = webdriver.Chrome(path, options=options)
-driver_yes24 = webdriver.Chrome(path, options=options)
-url_interpark = 'http://ticket.interpark.com/webzine/paper/TPNoticeList.asp#'
-url_yes24 = 'http://ticket.yes24.com/New/Notice/NoticeMain.aspx'
-
-driver_interpark.get(url_interpark)
-driver_yes24.get(url_yes24)
-driver_interpark.switch_to.frame('iFrmNotice')
-
-frm_interpark = driver_interpark.page_source
-source_yes24 = driver_yes24.page_source
-# time.sleep(2)
-
-soup_interpark = BeautifulSoup(frm_interpark, 'html.parser')
-soup_yes24 = BeautifulSoup(source_yes24, 'html.parser')
-fulldata_interpark = soup_interpark.select('div.section_notice > div.board > div.list > div.table > table > tbody > tr')
-fulldata_yes24 = soup_yes24.select('#NoticeMainDisplay > div#BoardList > div.noti-tbl > table > tbody > tr')
-
-# for data in fulldata_interpark:
-#     type = data.select_one('td.type').text
-#     if type == '뮤지컬' or type == '연극':
-#         data.append('----------interpark')
-#         print(data)
 
 
-for data in fulldata_yes24:
-    type = data.select_one('td:nth-child(1)')
-    if type is not None:
-        type = data.select_one('td:nth-child(1)').text.strip()
-        url = data.select_one('td:nth-child(2)')
-        a_tag = data.select_one('td:nth-child(2) > a')
-        ticket_open_time = data.select_one('td:nth-child(3)').text.strip()
-        find_string = ['뮤지컬', '연극']
-        title = ''
-        param = ''
-        exclusive_sale = ''
-        full_url = []
-        if type == '티켓오픈':
-            if a_tag is not None:
-                param = a_tag['href']
-                span = a_tag.select_one('em:nth-child(1) > span')
-                # print(param)
-                if span is not None:
-                    title = data.select_one('em:nth-child(2)')
-                    exclusive_sale = span.text
+def get_interpark_info():
+    driver_interpark = webdriver.Chrome(path, options=options)
+    url_interpark = 'http://ticket.interpark.com/webzine/paper/TPNoticeList.asp#'
+    driver_interpark.get(url_interpark)
+    driver_interpark.switch_to.frame('iFrmNotice')
+    frm_interpark = driver_interpark.page_source
+    soup_interpark = BeautifulSoup(frm_interpark, 'html.parser')
+    fulldata_interpark = soup_interpark.select(
+        'div.section_notice > div.board > div.list > div.table > table > tbody > tr')
+
+    for data in fulldata_interpark:
+        type = data.select_one('td.type').text
+        url = data.select_one('td.subject > a')['href']
+        title = data.select_one('td.subject > a').text
+        ticket_open_time = data.select_one('td.date').text
+        detail_url = []
+        if type == '뮤지컬' or type == '연극':
+            detail_url.append('http://ticket.interpark.com/webzine/paper/')
+            detail_url.append(url)
+            detail_url = ''.join(detail_url)
+            driver_interpark.get(detail_url)
+            soup_interpark = BeautifulSoup(driver_interpark.page_source, "html.parser")
+
+            # 티켓오픈 게시글 내용 스크래핑 (상단)
+            detail_top = soup_interpark.select(
+                '#wrapBody > div > div > div.board > div.detail_top > div.info')
+            exclusive_sale = ''
+            poster = ''
+            reserve_url = ''
+
+            for top in detail_top:
+                poster = top.select_one('span.poster > img')['src']
+                reserve_url = top.select_one('div.btn > a.btn_book')
+                if reserve_url is not None:
+                    reserve_url = top.select_one('div.btn > a.btn_book')['href']
                 else:
-                    span2 = ''
-                    title = data.select_one('em:nth-child(1)')
+                    reserve_url = ''
 
-                for str in find_string:
-                    if title.text.find(str) != -1:
-                        full_url.append(url_yes24)
-                        full_url.append(param)
-                        full_url = ''.join(full_url)
-                        print(full_url, type, ticket_open_time, exclusive_sale, title.text)
+                additional_info = top.select_one('h3 > span')
+                # print(time.strftime('%y%m%d%H%M', time.localtime(time.time())))
+                # print(replaceTimeFormat(ticket_open_time))
+                for a_info in additional_info:
+                    if a_info == '단독판매':
+                        exclusive_sale = a_info
+
+            # 티켓오픈 게시글 내용 스크래핑 (하단/내용)
+            detail_cont = soup_interpark.select('#wrapBody > div > div > div.board > div.desc')
+            for detail in detail_cont:
+                summary = detail.select_one('div.introduce > div.data > p')
+                discount_info = detail.select_one('div.info_discount > div.data > p')
+                content = detail.select_one('div.info1 > div.data > p')
+                cast_company = detail.select('div.info2 > div.data > p')
+                cast = ''
+                company = ''
+                for idx, str in enumerate(cast_company):
+                    if idx == 0:
+                        cast = str
+                    if idx == 1:
+                        company = str
+
+                print(title)
+                print(cast)
+                print(company)
+            # print(title, exclusive_sale, ticket_open_time, poster, reserve_url)
+
+    driver_interpark.quit()
 
 
-driver_interpark.quit()
-driver_yes24.quit()
+def get_yes24_info():
+    driver_yes24 = webdriver.Chrome(path, options=options)
+    url_yes24 = 'http://ticket.yes24.com/New/Notice/NoticeMain.aspx'
+    driver_yes24.get(url_yes24)
+    source_yes24 = driver_yes24.page_source
+    soup_yes24 = BeautifulSoup(source_yes24, 'html.parser')
+    fulldata_yes24 = soup_yes24.select('#NoticeMainDisplay > div#BoardList > div.noti-tbl > table > tbody > tr')
+
+    for data in fulldata_yes24:
+        type = data.select_one('td:nth-child(1)')
+        if type is not None:
+            type = data.select_one('td:nth-child(1)').text.strip()
+            url = data.select_one('td:nth-child(2)')
+            a_tag = data.select_one('td:nth-child(2) > a')
+            ticket_open_time = data.select_one('td:nth-child(3)').text.strip()
+            find_string = ['뮤지컬', '연극']
+            title = ''
+            param = ''
+            exclusive_sale = ''
+            full_url = []
+            if type == '티켓오픈':
+                if a_tag is not None:
+                    param = a_tag['href']
+                    span = a_tag.select_one('em:nth-child(1) > span')
+                    # print(param)
+                    if span is not None:
+                        title = data.select_one('em:nth-child(2)')
+                        exclusive_sale = span.text
+                    else:
+                        span2 = ''
+                        title = data.select_one('em:nth-child(1)')
+
+                    for str in find_string:
+                        if title.text.find(str) != -1:
+                            full_url.append(url_yes24)
+                            full_url.append(param)
+                            full_url = ''.join(full_url)
+                            print(full_url, type, ticket_open_time, exclusive_sale, title.text)
+
+    driver_yes24.quit()
+
+
+def replaceTimeFormat(time):
+    pattern = re.compile(r'\s+')
+    time = re.sub('[.:()월화수목금토일]', '', time)
+    time = re.sub(pattern, '', time)
+    # time = re.sub(kor_regex, '', time).strip()
+
+    return time
+
+
+def job():
+    get_interpark_info()
+    # get_yes24_info()
+
+
+def run():
+    schedule.every(30).seconds.do(job)
+    while True:
+        schedule.run_pending()
+
+
+if __name__ == "__main__":
+    # run()
+    job()
+
+# time.sleep(2)

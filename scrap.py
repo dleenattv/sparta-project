@@ -5,8 +5,8 @@ from pymongo import MongoClient
 import time
 import re
 
-client = MongoClient('localhost', 27017)
-db = client.openinfo
+client = MongoClient('mongodb://test:test@13.125.119.199', 27017)
+db = client.ticketProject
 
 # selenium 옵션
 options = webdriver.ChromeOptions()
@@ -19,7 +19,7 @@ options.add_argument(
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36'}
 
-path = 'C:/Users/YJ/Desktop/sparta/chromedriver'
+path = '/home/ubuntu/sparta-project/chromedriver'
 
 
 def get_interpark_info():
@@ -90,9 +90,13 @@ def get_interpark_info():
     driver_interpark.quit()
 
 
-def get_yes24_info():
+def get_yes24_info(ids):
+
     driver_yes24 = webdriver.Chrome(path, options=options)
-    url_yes24 = 'http://ticket.yes24.com/New/Notice/NoticeMain.aspx'
+    url_yes24 = f'{"http://ticket.yes24.com/New/Notice/NoticeMain.aspx#page="}{ids}'
+    main_yes24 = "http://ticket.yes24.com/New/Notice/NoticeMain.aspx"
+    print(url_yes24)
+    time.sleep(2)
     driver_yes24.get(url_yes24)
     source_yes24 = driver_yes24.page_source
     soup_yes24 = BeautifulSoup(source_yes24, 'html.parser')
@@ -105,29 +109,55 @@ def get_yes24_info():
             url = data.select_one('td:nth-child(2)')
             a_tag = data.select_one('td:nth-child(2) > a')
             ticket_open_time = data.select_one('td:nth-child(3)').text.strip()
+
             find_string = ['뮤지컬', '연극']
+            out_title = ''
             title = ''
             param = ''
             exclusive_sale = ''
             full_url = []
+            img_url = ''
+
             if type == '티켓오픈':
                 if a_tag is not None:
                     param = a_tag['href']
                     span = a_tag.select_one('em:nth-child(1) > span')
-                    # print(param)
                     if span is not None:
-                        title = data.select_one('em:nth-child(2)')
+                        out_title = data.select_one('em:nth-child(2)')
                         exclusive_sale = span.text
                     else:
-                        span2 = ''
-                        title = data.select_one('em:nth-child(1)')
+                        out_title = data.select_one('em:nth-child(1)')
 
                     for str in find_string:
-                        if title.text.find(str) != -1:
-                            full_url.append(url_yes24)
+                        if out_title.text.find(str) != -1:
+                            full_url.append(main_yes24)
                             full_url.append(param)
                             full_url = ''.join(full_url)
-                            print(full_url, type, ticket_open_time, exclusive_sale, title.text)
+                            # 내부 크롤링
+                            driver_yes24.get(full_url)
+                            soup_yes24 = BeautifulSoup(driver_yes24.page_source, "html.parser")
+                            detail_top = soup_yes24.select(
+                                '#NoticeRead > div.noti-view-ticket > div.noti-vt-layout')
+                            for data in detail_top:
+                                title = data.select_one('div.noti-vt-right > p.noti-vt-tit')
+                                img_url = data.select_one('div.noti-vt-left > img')['src']
+                                span_elements = title.find_all("span")
+                                for span in span_elements:
+                                    span.extract()
+
+                            yes24_doc = {
+                                'title': title.text,
+                                'link': full_url,
+                                'img_url': img_url,
+                                'type': type,
+                                'open_time': ticket_open_time,
+                                'exclusive_sale': exclusive_sale
+                            }
+
+                            db.openinfo.insert_one(yes24_doc)
+                            print(title.text)
+                            print(full_url, type, ticket_open_time, exclusive_sale)
+                            print(img_url)
 
     driver_yes24.quit()
 
@@ -136,17 +166,21 @@ def replaceTimeFormat(time):
     pattern = re.compile(r'\s+')
     time = re.sub('[.:()월화수목금토일]', '', time)
     time = re.sub(pattern, '', time)
-    # time = re.sub(kor_regex, '', time).strip()
 
     return time
 
 
 def job():
-    get_interpark_info()
-    # get_yes24_info()
+    # get_interpark_info()
+    db.openinfo.remove({})
+    get_yes24_info(1)
+    get_yes24_info(2)
 
 
 def run():
+    # On Server
+    # schedule.every(1).hours.do(job)
+    # For Test
     schedule.every(30).seconds.do(job)
     while True:
         schedule.run_pending()

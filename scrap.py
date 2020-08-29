@@ -1,11 +1,18 @@
 import schedule
-from selenium import webdriver
-from bs4 import BeautifulSoup
-from pymongo import MongoClient
 import time
 import re
 
+from selenium import webdriver
+from bs4 import BeautifulSoup
+
+from pymongo import MongoClient
+
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 client = MongoClient('mongodb://test:test@13.125.119.199', 27017)
+# client = MongoClient('localhost', 27017)
 db = client.ticketProject
 
 # selenium 옵션
@@ -20,6 +27,7 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36'}
 
 path = '/home/ubuntu/sparta-project/chromedriver'
+# path = 'C://Users/YJ/Desktop/sparta/sparta-project/chromedriver.exe'
 
 
 def get_interpark_info():
@@ -91,7 +99,6 @@ def get_interpark_info():
 
 
 def get_yes24_info(ids):
-
     driver_yes24 = webdriver.Chrome(path, options=options)
     url_yes24 = f'{"http://ticket.yes24.com/New/Notice/NoticeMain.aspx#page="}{ids}'
     main_yes24 = "http://ticket.yes24.com/New/Notice/NoticeMain.aspx"
@@ -158,11 +165,10 @@ def get_yes24_info(ids):
                             print(title.text)
                             print(full_url, type, ticket_open_time, exclusive_sale)
                             print(img_url)
-
     driver_yes24.quit()
 
 
-def replaceTimeFormat(time):
+def replace_time_format(time):
     pattern = re.compile(r'\s+')
     time = re.sub('[.:()월화수목금토일]', '', time)
     time = re.sub(pattern, '', time)
@@ -170,24 +176,78 @@ def replaceTimeFormat(time):
     return time
 
 
+def send_mail():
+    get_day = time.strftime('%Y%m%d%H', time.localtime(time.time()))
+    test_day = '20200910'
+    reserv_title = []
+    msg_detail = []
+    # for Server
+    # if get_day[8:2] == '09':
+    open_info = list(db.openinfo.find({}, {'_id': 0}).sort('open_time', 1))
+
+    for info in open_info:
+        open_time = info['open_time']
+        open_time = replace_time_format(open_time)[0:8]
+        if test_day == open_time:
+            open_title = info['title']
+            reserv_title.append(open_title)
+            # print(reserv_title)
+            # print(test_day, open_time)
+            # print(len(reserv_title))
+
+    if len(reserv_title) > 0:
+
+        full_email = list(db.requestEmails.find({}, {'_id': 0}))
+        for saved_mail in full_email:
+            for titles in reserv_title:
+                admin_mail = 'maildontforget@gmail.com'
+                admin_pw = 'uazigsftmztmwiwr'
+                receiver_mail = saved_mail['email']
+
+                msg = MIMEMultipart('alternative')
+
+                msg['Subject'] = titles
+                msg['From'] = admin_mail
+                msg['To'] = receiver_mail
+                print(titles)
+                msg_detail.append('<h1>안녕하세요.</h1> ')
+                # msg_detail.append(receiver_mail)
+                # msg_detail.append('님,</h1>')
+                msg_detail.append('<h2>오늘자 티켓오픈 정보를 전달드립니다.<br/>')
+                msg_detail.append('잊지말고 티켓팅하세요 :)<br/></h2>')
+                msg_detail.append(titles)
+
+                # msg_cont = '<h1>테스트입니다2</h1>'
+                msg_cont = ''.join(msg_detail)
+                mail_type = MIMEText(msg_cont, 'html')
+                msg.attach(mail_type)
+
+                mail_service = smtplib.SMTP_SSL('smtp.gmail.com')
+                mail_service.login(admin_mail, admin_pw)
+                mail_service.sendmail(admin_mail, receiver_mail, msg.as_string())
+                mail_service.quit()
+                print(receiver_mail, 'MAIL SEND DONE')
+
+
 def job():
     # get_interpark_info()
     db.openinfo.remove({})
     get_yes24_info(1)
     get_yes24_info(2)
+    send_mail()
 
 
 def run():
     # On Server
-    # schedule.every(1).hours.do(job)
+    schedule.every(1).hours.do(job)
     # For Test
-    schedule.every(30).seconds.do(job)
+    # schedule.every(30).seconds.do(job)
     while True:
         schedule.run_pending()
 
 
 if __name__ == "__main__":
-    # run()
-    job()
+    run()
+    #job()
 
 # time.sleep(2)

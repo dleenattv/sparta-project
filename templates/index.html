@@ -26,7 +26,11 @@
         <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=Noto+Serif+KR&display=swap"
               rel="stylesheet">
 
-        <title>스파르타코딩클럽 | 나홀로 메모장</title>
+        <title>DON'T FORGET | 데일리 티켓오픈 알림</title>
+
+        <meta property="og:title" content="DON'T FORGET | 데일리 티켓오픈 알림"/>
+        <meta property="og:description" content="보고싶었던 공연, 놓치지 마세요."/>
+        <meta property="og:image" content="{{ url_for('static', filename='og_img.png') }}"/>
 
         <!-- style -->
         <style type="text/css">
@@ -93,21 +97,27 @@
                             loopCount = 4;
                         } else if (open_info.length <= 8) {
                             loopCount = 8;
+                        } else {
+                            loopCount = open_info.length;
                         }
                         for (let i = 0; i < loopCount; i++) {
+                            console.log(i);
                             if (i < 4) {
                                 if (open_info.length - 1 >= i) {
-                                    makeCard(i, open_info[i]['link'], open_info[i]['title'], open_info[i]['exclusive_sale'], open_info[i]['open_time'], open_info[i]['img_url'], 1);
+                                    makeCard(i, open_info[i]['link'], open_info[i]["title"], open_info[i]['exclusive_sale'], open_info[i]['open_time'], open_info[i]['img_url'], 1);
                                 } else {
-                                    makeCard(i, '#', '준비중', '', '', 'https://cdn.icon-icons.com/icons2/1993/PNG/512/circle_customer_help_info_information_service_support_icon_123208.png', 1)
+                                    makeCard(i, '#', '준비중', '', '', 'https://image.flaticon.com/icons/svg/659/659889.svg', 1)
                                 }
-
+                                $("#carousel-control-prev").hide();
+                                $("#carousel-control-next").hide();
                             } else if (i < 8) {
                                 if (open_info.length - 1 >= i) {
                                     makeCard(i, open_info[i]['link'], open_info[i]['title'], open_info[i]['exclusive_sale'], open_info[i]['open_time'], open_info[i]['img_url'], 2);
                                 } else {
-                                    makeCard(i, '#', '준비중', '', '', 'https://cdn.icon-icons.com/icons2/1993/PNG/512/circle_customer_help_info_information_service_support_icon_123208.png', 2)
+                                    makeCard(i, '#', '준비중', '', '', 'https://image.flaticon.com/icons/svg/659/659889.svg', 2)
                                 }
+                                $("#carousel-control-prev").show();
+                                $("#carousel-control-next").show();
                             }
                         }
                     }
@@ -117,13 +127,13 @@
             function makeCard(cnt, url, title, desc, comment, image, id) {
                 let tempCard = '';
                 let appendId = '';
-                if (title.length > 26) {
-                    title = title.substring(0, 26) + '...';
+                if (title.length > 24) {
+                    title = title.substring(0, 22) + '...';
                 }
 
                 if (cnt === 4) {
                     tempCard = `
-                    <div class="carousel-item" style="display: none">
+                    <div class="carousel-item"">
                         <div id="cards-box2" class="card-columns d-flex">
                             <div class="card">
                                 <div style="height: 291px">
@@ -177,7 +187,8 @@
                     alert("시간을 설정해주세요.");
                     $("#selectTime").focus();
                     return false;
-                } else */if (!obj.email) {
+                } else */
+                if (!obj.email) {
                     alert("메일주소를 입력해주세요.");
                     $("#inputEmail").focus();
                     return false;
@@ -226,31 +237,20 @@
                 <h1>TICKET OPEN</h1>
                 <br>
                 <div id="carouselExampleSlidesOnly" class="carousel slide" data-ride="carousel">
-                    <ol class="carousel-indicators">
-                        <li data-target="#carouselExampleIndicators" data-slide-to="0" class="active"></li>
-                        <li data-target="#carouselExampleIndicators" data-slide-to="1"></li>
-                        <li data-target="#carouselExampleIndicators" data-slide-to="2"></li>
-                    </ol>
                     <div class="carousel-inner" id="carousel-inner">
                         <div class="carousel-item active">
                             <div id="cards-box1" class="card-columns d-flex">
 
                             </div>
                         </div>
-
-                        <!--                        <div class="carousel-item">-->
-                        <!--                            <div id="cards-box3" class="card-columns d-flex">-->
-
-                        <!--                            </div>-->
-                        <!--                        </div>-->
                     </div>
                     <a class="carousel-control-prev" href="#carouselExampleControls" role="button" data-slide="prev"
-                       onclick="$('#carouselExampleSlidesOnly').carousel('prev')">
+                       onclick="$('#carouselExampleSlidesOnly').carousel('prev')" id="carousel-control-prev">
                         <span class="carousel-control-prev-icon" aria-hidden="true"></span>
                         <span class="sr-only">Previous</span>
                     </a>
                     <a class="carousel-control-next" href="#carouselExampleControls" role="button" data-slide="next"
-                       onclick="$('#carouselExampleSlidesOnly').carousel('next')">
+                       onclick="$('#carouselExampleSlidesOnly').carousel('next')" id="carousel-control-next">
                         <span class="carousel-control-next-icon" aria-hidden="true"></span>
                         <span class="sr-only">Next</span>
                     </a>

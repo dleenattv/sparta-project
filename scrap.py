@@ -26,8 +26,8 @@ options.add_argument(
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36'}
 
-path = '/home/ubuntu/sparta-project/chromedriver'
-# path = 'C://Users/YJ/Desktop/sparta/sparta-project/chromedriver.exe'
+# path = '/home/ubuntu/sparta-project/chromedriver'
+path = 'C://Users/YJ/Desktop/sparta/sparta-project/chromedriver.exe'
 
 
 def get_interpark_info():
@@ -118,12 +118,11 @@ def get_yes24_info(ids):
             ticket_open_time = data.select_one('td:nth-child(3)').text.strip()
 
             find_string = ['뮤지컬', '연극']
-            out_title = ''
             title = ''
-            param = ''
             exclusive_sale = ''
             full_url = []
             img_url = ''
+            title_list = []
 
             if type == '티켓오픈':
                 if a_tag is not None:
@@ -149,6 +148,7 @@ def get_yes24_info(ids):
                                 title = data.select_one('div.noti-vt-right > p.noti-vt-tit')
                                 img_url = data.select_one('div.noti-vt-left > img')['src']
                                 span_elements = title.find_all("span")
+
                                 for span in span_elements:
                                     span.extract()
 
@@ -163,8 +163,9 @@ def get_yes24_info(ids):
 
                             db.openinfo.insert_one(yes24_doc)
                             print(title.text)
-                            print(full_url, type, ticket_open_time, exclusive_sale)
-                            print(img_url)
+                            # print(full_url, type, ticket_open_time, exclusive_sale)
+                            # print(img_url)
+
     driver_yes24.quit()
 
 
@@ -178,55 +179,78 @@ def replace_time_format(time):
 
 def send_mail():
     get_day = time.strftime('%Y%m%d%H', time.localtime(time.time()))
-    test_day = '20200910'
-    reserv_title = []
+    # test_day = '2020090201'
     msg_detail = []
+    tmp_info = []
     # for Server
-    # if get_day[8:2] == '09':
-    open_info = list(db.openinfo.find({}, {'_id': 0}).sort('open_time', 1))
+    print(get_day[8:])
 
-    for info in open_info:
-        open_time = info['open_time']
-        open_time = replace_time_format(open_time)[0:8]
-        if test_day == open_time:
-            open_title = info['title']
-            reserv_title.append(open_title)
-            # print(reserv_title)
-            # print(test_day, open_time)
-            # print(len(reserv_title))
+    if get_day[8:] == '01':
+        open_info = list(db.openinfo.find({}, {'_id': 0}).sort('open_time', 1))
 
-    if len(reserv_title) > 0:
+        for info in open_info:
+            open_time = info['open_time']
 
-        full_email = list(db.requestEmails.find({}, {'_id': 0}))
-        for saved_mail in full_email:
-            for titles in reserv_title:
-                admin_mail = 'maildontforget@gmail.com'
-                admin_pw = 'uazigsftmztmwiwr'
-                receiver_mail = saved_mail['email']
+            open_time = replace_time_format(open_time)[0:8]
+            if get_day[0:8] == open_time:
+                open_title = info['title']
+                img = info['img_url']
+                data = {
+                    'title': open_title,
+                    'img': img
+                }
+                tmp_info.append(data)
 
-                msg = MIMEMultipart('alternative')
+                # print(reserv_title)
+                # print(test_day, open_time)
+                # print(len(reserv_title))
+        print(tmp_info)
+        if len(tmp_info) > 0:
+            full_email = list(db.requestEmails.find({}, {'_id': 0}))
+            for info in tmp_info:
+                for saved_mail in full_email:
+                    subject = []
+                    admin_mail = 'maildontforget@gmail.com'
+                    admin_pw = 'uazigsftmztmwiwr'
+                    receiver_mail = saved_mail['email']
 
-                msg['Subject'] = titles
-                msg['From'] = admin_mail
-                msg['To'] = receiver_mail
-                print(titles)
-                msg_detail.append('<h1>안녕하세요.</h1> ')
-                # msg_detail.append(receiver_mail)
-                # msg_detail.append('님,</h1>')
-                msg_detail.append('<h2>오늘자 티켓오픈 정보를 전달드립니다.<br/>')
-                msg_detail.append('잊지말고 티켓팅하세요 :)<br/></h2>')
-                msg_detail.append(titles)
+                    msg = MIMEMultipart('alternative')
 
-                # msg_cont = '<h1>테스트입니다2</h1>'
-                msg_cont = ''.join(msg_detail)
-                mail_type = MIMEText(msg_cont, 'html')
-                msg.attach(mail_type)
+                    subject.append('티켓오픈 알림 :: ')
+                    subject.append(info['title'])
+                    msg['Subject'] = ''.join(subject)
+                    msg['From'] = admin_mail
+                    msg['To'] = receiver_mail
+                    print(info['title'])
+                    msg_detail.append('<div style="margin:auto;text-align:center;"><h2>안녕하세요.<br/>')
+                    msg_detail.append('오늘의 티켓오픈 정보를 전달드립니다.<br/>')
+                    msg_detail.append('잊지말고 티켓팅하세요 :)<br/></h2>')
+                    msg_detail.append('<div><img width="200px" src="')
+                    msg_detail.append(info['img'])
+                    msg_detail.append('"></div><br/><font size="4px">')
+                    msg_detail.append(info['title'])
+                    msg_detail.append('</font><br/><br/>')
+                    # msg_detail.append('예매하러 가기 ▶ ')
+                    # msg_detail.append('http://dailyticketopen.shop')
+                    msg_detail.append('<a style="font-size: 18px;font-weight:bold;padding: 12px 18px;margin-bottom: 0;'
+                                      'display: inline-block;text-decoration: none;text-align: center;'
+                                      'white-space: nowrap;vertical-align: middle;-ms-touch-action: manipulation;'
+                                      'touch-action: manipulation;cursor: pointer;-webkit-user-select: none;'
+                                      '-moz-user-select: none;-ms-user-select: none;user-select: none;background-image: none;'
+                                      'border: 1px solid transparent;color: #fff;background-color: #1777ff;border-color: #fff;border-radius:5px;" '
+                                      'href="http://dailyticketopen.shop" role="button">예매하러 가기</a></div>')
 
-                mail_service = smtplib.SMTP_SSL('smtp.gmail.com')
-                mail_service.login(admin_mail, admin_pw)
-                mail_service.sendmail(admin_mail, receiver_mail, msg.as_string())
-                mail_service.quit()
-                print(receiver_mail, 'MAIL SEND DONE')
+                    msg_cont = ''.join(msg_detail)
+                    mail_type = MIMEText(msg_cont, 'html')
+                    del msg_detail[0:len(msg_detail)]
+                    print(msg_cont)
+                    msg.attach(mail_type)
+
+                    mail_service = smtplib.SMTP_SSL('smtp.gmail.com')
+                    mail_service.login(admin_mail, admin_pw)
+                    mail_service.sendmail(admin_mail, receiver_mail, msg.as_string())
+                    mail_service.quit()
+                    print(receiver_mail, 'MAIL SEND DONE')
 
 
 def job():
@@ -239,15 +263,15 @@ def job():
 
 def run():
     # On Server
-    schedule.every(1).hours.do(job)
+    # schedule.every(1).hours.do(job)
     # For Test
-    # schedule.every(30).seconds.do(job)
+    schedule.every(30).seconds.do(job)
     while True:
         schedule.run_pending()
 
 
 if __name__ == "__main__":
-    run()
-    #job()
+    # run()
+    job()
 
 # time.sleep(2)

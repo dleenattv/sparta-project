@@ -19,18 +19,23 @@ def show_index():
 @app.route('/ticketOpen', methods=['POST'])
 def save_emails():
     recv_email = request.form['req_email']
-    # db.requestEmails.insert_one({'email':recv_email})
-    # result = 'success'
-    saved_emails = list(db.requestEmails.find({}, {'_id': 0}))
-    result = ''
+    saved_emails = list(db.requestEmails.find({'email': recv_email}, {'_id': 0}))
+    find_count = 0
+    print(saved_emails)
+    if len(saved_emails) > 0:
+        for mail in saved_emails:
+            print(find_count)
+            print(mail['email'], recv_email)
 
-    for mail in saved_emails:
-        if mail['email'] != recv_email:
+            if mail['email'] == recv_email:
+                find_count += 1
+                result = 'overlap'
+                return jsonify({'result': result})
+    else:
+        if find_count == 0:
             db.requestEmails.insert_one({'email': recv_email})
             result = 'success'
-        else:
-            result = 'overlap'
-    return jsonify({'result': result})
+            return jsonify({'result': result})
 
 
 @app.route('/ticketOpen', methods=['GET'])
@@ -44,6 +49,7 @@ def view_ticket_open():
         if open_time >= now:
             open_info.append(element)
 
+    print(open_info)
     return jsonify({'open_info': open_info})
 
 
@@ -57,5 +63,5 @@ def replace_time_format(time_str):
 
 
 if __name__ == '__main__':
-    # app.run('localhost', port=5000, debug=True)
-    app.run('0.0.0.0', port=5000, debug=True)
+    app.run('localhost', port=5000, debug=True)
+    # app.run('0.0.0.0', port=5000, debug=True)
